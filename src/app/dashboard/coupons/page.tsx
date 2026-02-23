@@ -8,10 +8,9 @@ import { getCurrentProfile } from '@/actions/auth';
 type Coupon = {
   id: string;
   createdBy: string;
-  assignedTo: string;
   title: string;
   description: string;
-  isRedeemed: boolean;
+  redeemed: boolean;
   redeemedAt: string;
   createdAt: string;
 };
