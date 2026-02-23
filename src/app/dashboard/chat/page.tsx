@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { appwriteClient } from '@/lib/appwrite/client';
 import {
   sendMessage,
+  loadChatHistory,
   decryptMessagePayload,
   markMessageSeen,
   getChatDeletePeriod,
@@ -38,43 +39,28 @@ export default function ChatPage() {
   const [deliveryMode, setDeliveryMode] = useState<ChatDeliveryMode>('keep');
   const [deletePeriod, setDeletePeriodState] = useState<ChatDeletePeriod>('never');
   const [savingPeriod, setSavingPeriod] = useState(false);
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  async function loadHistory(currentUserId: string, currentChatId: string) {
-    const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-    const MSG_ID = process.env.NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!;
-    const { databases } = await import('@/lib/appwrite/client');
-    const { Query } = await import('appwrite');
-
+  async function loadMessages(currentUserId: string, currentChatId: string) {
     try {
-      const history = await databases.listDocuments(DB_ID, MSG_ID, [
-        Query.equal('chat_id', currentChatId),
-        Query.orderAsc('$createdAt'),
-        Query.limit(150)
-      ]);
+      setLoading(true);
+      // Use server action to bypass CORS
+      const result = await loadChatHistory(currentUserId, currentChatId);
+      
+      if (result.success && result.messages) {
+        setMessages(result.messages);
 
-      const decryptedMessages = await Promise.all(
-        history.documents.map(async (doc) => {
-          const res = await decryptMessagePayload(String(doc.content));
-          return {
-            $id: String(doc.$id),
-            sender_id: String(doc.sender_id),
-            content: res.success ? res.plaintext! : '[Encrypted Message]',
-            message_type: String(doc.message_type || 'text') as 'text' | 'image' | 'video',
-            delivery_mode: (String(doc.delivery_mode || 'keep') as ChatDeliveryMode),
-            delete_period: (String(doc.delete_period || 'never') as ChatDeletePeriod),
-            expires_at: String(doc.expires_at || ''),
-            seen_by_json: String(doc.seen_by_json || '[]'),
-          } satisfies Message;
-        })
-      );
-
-      setMessages(decryptedMessages);
-
-      const unseenPartnerMessages = history.documents.filter((doc) => String(doc.sender_id) !== currentUserId);
-      await Promise.all(unseenPartnerMessages.map((doc) => markMessageSeen(String(doc.$id), currentUserId)));
+        // Mark unseen messages as seen
+        const unseenMessages = result.messages.filter((msg) => String(msg.sender_id) !== currentUserId);
+        await Promise.all(unseenMessages.map((msg) => markMessageSeen(msg.$id, currentUserId)));
+      } else {
+        console.error('Failed to load chat history:', result.error);
+      }
     } catch (e) {
-      console.error("Could not load history. Check Appwrite permissions.", e);
+      console.error("Could not load chat history:", e);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -96,7 +82,7 @@ export default function ChatPage() {
         setDeletePeriodState(period.period);
       }
 
-      await loadHistory(currentUserId, currentChatId);
+      await loadMessages(currentUserId, currentChatId);
 
       const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
       const MSG_ID = process.env.NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!;
@@ -107,11 +93,11 @@ export default function ChatPage() {
           const payload = response.payload as { chat_id?: string; $id?: string; sender_id?: string };
           if (payload.chat_id !== currentChatId) return;
 
-          await loadHistory(currentUserId, currentChatId);
+          await loadMessages(currentUserId, currentChatId);
 
           if (payload.$id && payload.sender_id && String(payload.sender_id) !== currentUserId) {
             await markMessageSeen(String(payload.$id), currentUserId);
-            await loadHistory(currentUserId, currentChatId);
+            await loadMessages(currentUserId, currentChatId);
           }
         }
       );
@@ -133,7 +119,7 @@ export default function ChatPage() {
     const contentToSend = newMessage.trim();
     setNewMessage('');
     await sendMessage(userId, partnerId, contentToSend, messageType, deliveryMode, deletePeriod);
-    await loadHistory(userId, chatId);
+    await loadMessages(userId, chatId);
   };
 
   const handleDeletePeriodChange = async (period: ChatDeletePeriod) => {
@@ -159,9 +145,18 @@ export default function ChatPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => {
-          const isMe = msg.sender_id === userId;
-          const hidden = shouldHideInChat(msg);
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-purple-300/60">Loading messages...</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-purple-300/60">No messages yet</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.sender_id === userId;
+            const hidden = shouldHideInChat(msg);
 
           return (
             <motion.div
@@ -197,14 +192,15 @@ export default function ChatPage() {
                     userId={userId}
                     onViewed={async () => {
                       await markMessageSeen(msg.$id, userId);
-                      await loadHistory(userId, chatId);
+                      await loadMessages(userId, chatId);
                     }}
                   />
                 )}
               </div>
             </motion.div>
           );
-        })}
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 

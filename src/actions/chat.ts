@@ -41,6 +41,45 @@ function generateChatId(userA: string, userB: string) {
   return [userA, userB].sort().join('_');
 }
 
+export async function loadChatHistory(userId: string, chatId: string) {
+  try {
+    const { databases } = await createAdminClient();
+    const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+    const MSG_ID = process.env.NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!;
+
+    if (!MSG_ID) {
+      return { success: false, error: 'Messages collection not configured' };
+    }
+
+    const result = await databases.listDocuments(DB_ID, MSG_ID, [
+      Query.equal('chat_id', chatId),
+      Query.orderAsc('$createdAt'),
+      Query.limit(150),
+    ]);
+
+    const messages = await Promise.all(
+      result.documents.map(async (doc) => {
+        const decrypted = await decryptMessagePayload(String(doc.content));
+        return {
+          $id: String(doc.$id),
+          sender_id: String(doc.sender_id || ''),
+          content: decrypted.success ? decrypted.plaintext! : '[Encrypted Message]',
+          message_type: String(doc.message_type || 'text') as 'text' | 'image' | 'video',
+          delivery_mode: (String(doc.delivery_mode || 'keep') as ChatDeliveryMode),
+          delete_period: (String(doc.delete_period || 'never') as ChatDeletePeriod),
+          expires_at: String(doc.expires_at || ''),
+          seen_by_json: String(doc.seen_by_json || '[]'),
+        };
+      })
+    );
+
+    return { success: true, messages };
+  } catch (error: unknown) {
+    console.error('Failed to load chat history:', error);
+    return { success: false, error: getErrorMessage(error), messages: [] };
+  }
+}
+
 export async function getChatDeletePeriod(userId: string, partnerId: string) {
   try {
     const SETTINGS_ID = process.env.NEXT_PUBLIC_APPWRITE_CHAT_SETTINGS_COLLECTION_ID!;
