@@ -12,11 +12,19 @@ function getErrorMessage(error: unknown) {
 }
 
 function getSocialCollectionId() {
-  return process.env.NEXT_PUBLIC_APPWRITE_SOCIAL_COLLECTION_ID!;
+  const id = process.env.NEXT_PUBLIC_APPWRITE_SOCIAL_COLLECTION_ID;
+  if (!id) {
+    throw new Error('NEXT_PUBLIC_APPWRITE_SOCIAL_COLLECTION_ID is not configured');
+  }
+  return id;
 }
 
 function getSocialConnectionsCollectionId() {
-  return process.env.NEXT_PUBLIC_APPWRITE_SOCIAL_CONNECTIONS_COLLECTION_ID!;
+  const id = process.env.NEXT_PUBLIC_APPWRITE_SOCIAL_CONNECTIONS_COLLECTION_ID;
+  if (!id) {
+    throw new Error('NEXT_PUBLIC_APPWRITE_SOCIAL_CONNECTIONS_COLLECTION_ID is not configured');
+  }
+  return id;
 }
 
 function todayString() {
