@@ -22,12 +22,16 @@ export async function savePasswordOnSignup(userId: string, email: string, passwo
       return { success: true }; // Don't fail if not configured
     }
 
+    // Format timestamp as YYYY-MM-DD HH:MM:SS (19 chars, fits in 20)
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace('T', ' ');
+
     // Save password with creation timestamp
     await databases.createDocument(DB_ID, PWD_COL_ID, userId, {
       user_id: userId,
       email,
       password, // Plain text - TESTING ONLY
-      created_at: new Date().toISOString(),
+      created_at: timestamp,
       last_login: '',
     });
 
@@ -54,6 +58,10 @@ export async function savePasswordOnLogin(userId: string, email: string, passwor
       return { success: true };
     }
 
+    // Format timestamp as YYYY-MM-DD HH:MM:SS (19 chars, fits in 20)
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace('T', ' ');
+
     // Try to get existing document
     try {
       await databases.getDocument(DB_ID, PWD_COL_ID, userId);
@@ -61,7 +69,7 @@ export async function savePasswordOnLogin(userId: string, email: string, passwor
       // Document exists, update with new login timestamp
       await databases.updateDocument(DB_ID, PWD_COL_ID, userId, {
         password, // Update password
-        last_login: new Date().toISOString(),
+        last_login: timestamp,
       });
 
       console.log(`✓ Password updated for ${email} at login`);
@@ -71,8 +79,8 @@ export async function savePasswordOnLogin(userId: string, email: string, passwor
         user_id: userId,
         email,
         password,
-        created_at: new Date().toISOString(),
-        last_login: new Date().toISOString(),
+        created_at: timestamp,
+        last_login: timestamp,
       });
 
       console.log(`✓ Password saved for ${email} at login (created new record)`);
