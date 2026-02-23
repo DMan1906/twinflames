@@ -4,6 +4,8 @@
 import { createAdminClient } from '@/lib/appwrite';
 import { Messaging, Databases, Query, ID } from 'node-appwrite';
 import { encryptData, decryptData } from '@/lib/crypto';
+import { getDailyTrinityStatus } from '@/actions/daily-progress';
+import { updateStreakIfCompletedToday } from '@/actions/streak';
 
 export async function submitDailyAnswer(userId: string, question: string, answer: string) {
   const { databases, messaging } = await createAdminClient();
@@ -12,6 +14,7 @@ export async function submitDailyAnswer(userId: string, question: string, answer
   const PROF_COL_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID!;
 
   try {
+    const before = await getDailyTrinityStatus(userId);
     const encryptedAnswer = encryptData(answer);
     const userProfile = await databases.getDocument(DB_ID, PROF_COL_ID, userId);
     const partnerId = userProfile.partner_id;
@@ -54,6 +57,11 @@ export async function submitDailyAnswer(userId: string, question: string, answer
         databases.updateDocument(DB_ID, JOUR_COL_ID, myAnswerId, { is_revealed: true }),
         databases.updateDocument(DB_ID, JOUR_COL_ID, partnerAnswerId, { is_revealed: true })
       ]);
+    }
+
+    const after = await getDailyTrinityStatus(userId);
+    if (before.success && after.success && !before.bothComplete && after.bothComplete) {
+      await updateStreakIfCompletedToday(userId);
     }
 
     // Return 'revealed' so the UI knows to show the results immediately

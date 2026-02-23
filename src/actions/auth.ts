@@ -157,3 +157,32 @@ export async function getCurrentProfile() {
     return { success: false, error: 'Not authenticated' };
   }
 }
+
+/**
+ * Disconnects both partner accounts ("breakup" flow)
+ */
+export async function unlinkPartner(myUserId: string) {
+  try {
+    const { databases } = await createAdminClient();
+    const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+    const PROFILES_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID!;
+
+    const myProfile = await databases.getDocument(DB_ID, PROFILES_ID, myUserId);
+    const partnerId = myProfile.partner_id;
+
+    if (!partnerId) {
+      return { success: false, error: 'No partner is currently linked.' };
+    }
+
+    await Promise.all([
+      databases.updateDocument(DB_ID, PROFILES_ID, myUserId, { partner_id: null }),
+      databases.updateDocument(DB_ID, PROFILES_ID, String(partnerId), { partner_id: null }),
+    ]);
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('unlinkPartner failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to unlink partner.';
+    return { success: false, error: errorMessage };
+  }
+}
