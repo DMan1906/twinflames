@@ -2,11 +2,41 @@
 import 'server-only';
 import * as Minio from 'minio';
 
+// Parse MinIO endpoint - handle both formats:
+// - "localhost:9000" (hostname:port)
+// - "http://localhost:9000" (full URL)
+function parseMinioEndpoint() {
+  const endpoint = process.env.MINIO_ENDPOINT || 'localhost:9000';
+  let url: URL;
+  
+  try {
+    // Try parsing as full URL
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      url = new URL(endpoint);
+      return {
+        endPoint: url.hostname || 'localhost',
+        port: url.port ? parseInt(url.port, 10) : 9000,
+        useSSL: url.protocol === 'https:',
+      };
+    }
+  } catch {}
+  
+  // Parse as "host:port" format
+  const parts = endpoint.split(':');
+  return {
+    endPoint: parts[0] || 'localhost',
+    port: parts[1] ? parseInt(parts[1], 10) : 9000,
+    useSSL: process.env.NODE_ENV === 'production',
+  };
+}
+
+const minioConfig = parseMinioEndpoint();
+
 // Initialize the MinIO client using environment variables
 export const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'localhost',
-  port: 9000, // Default MinIO port; adjust if your setup uses a different one
-  useSSL: process.env.NODE_ENV === 'production',
+  endPoint: minioConfig.endPoint,
+  port: minioConfig.port,
+  useSSL: minioConfig.useSSL,
   accessKey: process.env.MINIO_ACCESS_KEY || '',
   secretKey: process.env.MINIO_SECRET_KEY || '',
 });

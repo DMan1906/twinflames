@@ -11,15 +11,30 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  */
 export async function generateText(prompt: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Try different model names in order of preference
+    let model;
+    const modelOptions = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
+    
+    for (const modelName of modelOptions) {
+      try {
+        model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-
-    return { 
-      success: true, 
-      plaintext: text 
-    };
+        return { 
+          success: true, 
+          plaintext: text 
+        };
+      } catch (err: any) {
+        // Continue to next model if this one fails
+        if (modelName === modelOptions[modelOptions.length - 1]) {
+          // Last model, rethrow error
+          throw err;
+        }
+      }
+    }
+    
+    return { success: false, error: 'AI is currently unavailable.' };
   } catch (error: any) {
     console.error('AI Text Generation failed:', error);
     return { success: false, error: 'AI is currently unavailable.' };
