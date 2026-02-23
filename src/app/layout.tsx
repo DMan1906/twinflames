@@ -2,6 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// Log startup
+if (typeof window === 'undefined') {
+  console.log('[TwinFlames] 🚀 Server starting up...');
+  console.log('[TwinFlames] Node env:', process.env.NODE_ENV);
+  console.log('[TwinFlames] Appwrite endpoint configured:', !!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -44,8 +51,7 @@ export default function RootLayout({
 }>) {
   // Debug logging for deployment
   if (typeof window !== 'undefined') {
-    console.log('🚀 TwinFlames App Loaded');
-    console.log('Environment:', process.env.NODE_ENV);
+    console.log('🚀 TwinFlames App Loaded (Client)');
   }
 
   return (
