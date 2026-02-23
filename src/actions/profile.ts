@@ -27,7 +27,7 @@ export async function updateProfileImage(userId: string, imageUrl: string) {
     const PROFILES_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID!;
 
     await databases.updateDocument(DB_ID, PROFILES_ID, userId, {
-      profile_image_url: imageUrl.trim(),
+      avatar_url: imageUrl.trim(),
     });
 
     return { success: true };
@@ -96,6 +96,7 @@ export async function getProfileDashboard(userId: string) {
     const PROFILES_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID!;
     const JOURNAL_ID = process.env.NEXT_PUBLIC_APPWRITE_JOURNAL_COLLECTION_ID!;
     const MILESTONES_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILE_MILESTONES_COLLECTION_ID!;
+    const STREAKS_ID = process.env.NEXT_PUBLIC_APPWRITE_STREAKS_COLLECTION_ID!;
 
     const profile = await databases.getDocument(DB_ID, PROFILES_ID, userId);
 
@@ -120,17 +121,34 @@ export async function getProfileDashboard(userId: string) {
       }));
     }
 
+    let currentStreak = 0;
+    let bestStreak = 0;
+    const partnerId = String(profile.partner_id || '');
+    if (STREAKS_ID && partnerId) {
+      const chatId = [userId, partnerId].sort().join('_');
+      const streakDocs = await databases.listDocuments(DB_ID, STREAKS_ID, [
+        Query.equal('chat_id', chatId),
+        Query.limit(1),
+      ]);
+
+      if (streakDocs.total > 0) {
+        const streak = streakDocs.documents[0];
+        currentStreak = asNumber(streak.current_count);
+        bestStreak = asNumber(streak.best_count, currentStreak);
+      }
+    }
+
     return {
       success: true,
       profile: {
         userId,
-        partnerId: String(profile.partner_id || ''),
+        partnerId,
         pairCode: String(profile.pair_code || ''),
-        currentStreak: asNumber(profile.streak_count),
-        bestStreak: asNumber(profile.best_streak, asNumber(profile.streak_count)),
+        currentStreak,
+        bestStreak,
         questionsAnswered: asNumber(questions.total),
         accountCreatedAt: String(profile.$createdAt),
-        profileImageUrl: String(profile.profile_image_url || ''),
+        profileImageUrl: String(profile.avatar_url || ''),
         milestones,
       },
     };

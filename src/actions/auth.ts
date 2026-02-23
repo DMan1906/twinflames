@@ -12,7 +12,7 @@ import { savePasswordOnSignup, savePasswordOnLogin } from '@/actions/test-passwo
  * Generates a random 6-character alphanumeric pairing code
  */
 function generatePairCode() {
-  return 'TF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  return 'TF' + crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
 /**
@@ -40,9 +40,12 @@ export async function signUp(email: string, password: string, name: string) {
         user_id: user.$id,
         name: name,
         email: email,
-        partner_id: null, 
+        avatar_url: '',
+        partner_id: null,
         pair_code: pairCode,
-        streak_count: 0,
+        last_daily_reset: '',
+        bio: '',
+        connected_at: '',
       }
     );
 

@@ -4,7 +4,6 @@
 import { generateText } from '@/actions/ai';
 import { createAdminClient } from '@/lib/appwrite';
 import { ID, Query } from 'node-appwrite';
-import { decryptData, encryptData } from '@/lib/crypto';
 
 type DateCategory = 'cozy' | 'adventurous' | 'romantic' | 'food' | 'random';
 type DateBudget = 'free' | 'low' | 'medium' | 'high';
@@ -156,17 +155,14 @@ export async function saveDateIdea(userId: string, idea: GeneratedDateIdea) {
     const { databases, DB_ID, chatId } = await getPairContext(userId);
     await databases.createDocument(DB_ID, DATES_ID, ID.unique(), {
       chat_id: chatId,
-      user_id: userId,
-      title: encryptData(idea.title),
-      summary: encryptData(idea.summary),
-      plan_json: encryptData(JSON.stringify(idea.plan)),
+      title: idea.title,
+      summary: idea.summary,
+      plan: JSON.stringify(idea.plan),
       category: idea.category,
       budget: idea.budget,
       source: idea.source,
-      is_favorite: false,
-      is_completed: false,
+      completed: false,
       completed_at: '',
-      created_at: todayString(),
     });
 
     return { success: true };
@@ -191,43 +187,18 @@ export async function getSavedDateIdeas(userId: string) {
 
     const ideas = docs.documents.map((doc) => ({
       id: String(doc.$id),
-      userId: String(doc.user_id),
-      title: decryptData(String(doc.title)),
-      summary: decryptData(String(doc.summary)),
-      plan: parseJson<string[]>(decryptData(String(doc.plan_json)), []),
+      title: String(doc.title),
+      summary: String(doc.summary),
+      plan: parseJson<string[]>(String(doc.plan || '[]'), []),
       category: String(doc.category),
       budget: String(doc.budget),
       source: String(doc.source),
-      isFavorite: Boolean(doc.is_favorite),
-      isCompleted: Boolean(doc.is_completed),
+      isCompleted: Boolean(doc.completed),
       completedAt: String(doc.completed_at || ''),
       createdAt: String(doc.$createdAt),
     }));
 
     return { success: true, ideas };
-  } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
-export async function toggleDateFavorite(userId: string, dateIdeaId: string, nextFavorite: boolean) {
-  try {
-    const DATES_ID = process.env.NEXT_PUBLIC_APPWRITE_DATES_COLLECTION_ID!;
-    if (!DATES_ID) {
-      return { success: false, error: 'Dates collection is not configured.' };
-    }
-
-    const { databases, DB_ID, chatId } = await getPairContext(userId);
-    const doc = await databases.getDocument(DB_ID, DATES_ID, dateIdeaId);
-    if (String(doc.chat_id) !== chatId) {
-      return { success: false, error: 'Date idea does not belong to this relationship.' };
-    }
-
-    await databases.updateDocument(DB_ID, DATES_ID, dateIdeaId, {
-      is_favorite: nextFavorite,
-    });
-
-    return { success: true };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
   }
@@ -247,7 +218,7 @@ export async function toggleDateCompleted(userId: string, dateIdeaId: string, ne
     }
 
     await databases.updateDocument(DB_ID, DATES_ID, dateIdeaId, {
-      is_completed: nextCompleted,
+      completed: nextCompleted,
       completed_at: nextCompleted ? todayString() : '',
     });
 

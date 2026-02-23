@@ -17,7 +17,8 @@ export async function submitEntry(chatId: string, userId: string, prompt: string
     user_id: userId,
     prompt,
     content: encrypted,
-    is_revealed: false
+    is_revealed: false,
+    partner_revealed: false,
   });
 
   // Check if partner has also answered today's prompt

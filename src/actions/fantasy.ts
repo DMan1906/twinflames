@@ -14,13 +14,15 @@ type FantasyCard = {
   createdAt: string;
 };
 
+type FantasyPayload = {
+  text: string;
+  votes: Record<string, SwipeChoice>;
+  matched: boolean;
+};
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return 'Unexpected fantasy error';
-}
-
-function todayString() {
-  return new Date().toISOString().split('T')[0];
 }
 
 function parseJson<T>(value: string | undefined, fallback: T): T {
@@ -69,6 +71,23 @@ Rules:
     .slice(0, count);
 }
 
+function parsePayload(raw: string | undefined, fallbackText = ''): FantasyPayload {
+  if (!raw) {
+    return { text: fallbackText, votes: {}, matched: false };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<FantasyPayload>;
+    return {
+      text: String(parsed.text || fallbackText),
+      votes: typeof parsed.votes === 'object' && parsed.votes ? parsed.votes as Record<string, SwipeChoice> : {},
+      matched: Boolean(parsed.matched),
+    };
+  } catch {
+    return { text: fallbackText, votes: {}, matched: false };
+  }
+}
+
 export async function ensureFantasyBuffer(userId: string) {
   try {
     const FANTASY_ID = process.env.NEXT_PUBLIC_APPWRITE_FANTASY_COLLECTION_ID!;
@@ -80,14 +99,14 @@ export async function ensureFantasyBuffer(userId: string) {
 
     const docs = await databases.listDocuments(DB_ID, FANTASY_ID, [
       Query.equal('chat_id', chatId),
-      Query.equal('is_archived', false),
+      Query.equal('status', 'saved'),
       Query.orderAsc('$createdAt'),
       Query.limit(500),
     ]);
 
     const remainingForUser = docs.documents.filter((doc) => {
-      const votes = parseJson<Record<string, SwipeChoice>>(String(doc.votes_json || '{}'), {});
-      return !votes[userId];
+      const payload = parsePayload(decryptData(String(doc.content || '')), String(doc.title || ''));
+      return !payload.votes[userId];
     }).length;
 
     if (remainingForUser > 3) {
@@ -103,11 +122,11 @@ export async function ensureFantasyBuffer(userId: string) {
       generated.map((text) =>
         databases.createDocument(DB_ID, FANTASY_ID, ID.unique(), {
           chat_id: chatId,
-          text: encryptData(text),
-          votes_json: JSON.stringify({}),
-          is_matched: false,
-          is_archived: false,
-          created_at: todayString(),
+          created_by: userId,
+          title: text.slice(0, 60),
+          content: encryptData(JSON.stringify({ text, votes: {}, matched: false })),
+          category: '',
+          status: 'saved',
         })
       )
     );
@@ -134,20 +153,20 @@ export async function getFantasyQueue(userId: string) {
 
     const docs = await databases.listDocuments(DB_ID, FANTASY_ID, [
       Query.equal('chat_id', chatId),
-      Query.equal('is_archived', false),
+      Query.equal('status', 'saved'),
       Query.orderAsc('$createdAt'),
       Query.limit(500),
     ]);
 
     const queue: FantasyCard[] = [];
     for (const doc of docs.documents) {
-      const votes = parseJson<Record<string, SwipeChoice>>(String(doc.votes_json || '{}'), {});
-      if (votes[userId]) continue;
+      const payload = parsePayload(decryptData(String(doc.content || '')), String(doc.title || ''));
+      if (payload.votes[userId]) continue;
 
       queue.push({
         id: String(doc.$id),
-        text: decryptData(String(doc.text)),
-        isMatched: Boolean(doc.is_matched),
+        text: payload.text,
+        isMatched: payload.matched,
         createdAt: String(doc.$createdAt),
       });
 
@@ -156,17 +175,22 @@ export async function getFantasyQueue(userId: string) {
 
     const matchedDocs = await databases.listDocuments(DB_ID, FANTASY_ID, [
       Query.equal('chat_id', chatId),
-      Query.equal('is_matched', true),
+      Query.equal('status', 'explored'),
       Query.orderDesc('$updatedAt'),
       Query.limit(50),
     ]);
 
-    const matched = matchedDocs.documents.map((doc) => ({
-      id: String(doc.$id),
-      text: decryptData(String(doc.text)),
-      isMatched: true,
-      createdAt: String(doc.$createdAt),
-    }));
+    const matched = matchedDocs.documents
+      .map((doc) => {
+        const payload = parsePayload(decryptData(String(doc.content || '')), String(doc.title || ''));
+        return {
+          id: String(doc.$id),
+          text: payload.text,
+          isMatched: payload.matched,
+          createdAt: String(doc.$createdAt),
+        };
+      })
+      .filter((item) => item.isMatched);
 
     return { success: true, queue, matched };
   } catch (error: unknown) {
@@ -192,16 +216,16 @@ export async function swipeFantasy(userId: string, fantasyId: string, choice: Sw
       return { success: false, error: 'Fantasy card does not belong to this relationship.' };
     }
 
-    const votes = parseJson<Record<string, SwipeChoice>>(String(fantasy.votes_json || '{}'), {});
-    votes[userId] = choice;
+    const payload = parsePayload(decryptData(String(fantasy.content || '')), String(fantasy.title || ''));
+    payload.votes[userId] = choice;
 
-    const bothVoted = Boolean(votes[userId] && votes[partnerId]);
-    const matched = bothVoted && votes[userId] === 'right' && votes[partnerId] === 'right';
+    const bothVoted = Boolean(payload.votes[userId] && payload.votes[partnerId]);
+    const matched = bothVoted && payload.votes[userId] === 'right' && payload.votes[partnerId] === 'right';
+    payload.matched = matched;
 
     await databases.updateDocument(DB_ID, FANTASY_ID, fantasyId, {
-      votes_json: JSON.stringify(votes),
-      is_matched: matched,
-      is_archived: bothVoted,
+      content: encryptData(JSON.stringify(payload)),
+      status: bothVoted ? 'explored' : 'saved',
     });
 
     return { success: true, matched };

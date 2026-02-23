@@ -7,7 +7,7 @@ import { createMemoryImageUploadUrl, deleteMemory, getMemories, saveMemory } fro
 
 type MemoryItem = {
   id: string;
-  userId: string;
+  createdBy: string;
   title: string;
   description: string;
   date: string;

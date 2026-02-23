@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { generateDateIdea, saveDateIdea, getSavedDateIdeas, toggleDateFavorite, toggleDateCompleted, deleteDateIdea } from '@/actions/dates';
+import { generateDateIdea, saveDateIdea, getSavedDateIdeas, toggleDateCompleted, deleteDateIdea } from '@/actions/dates';
 import { getCurrentProfile } from '@/actions/auth';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,8 +22,6 @@ type GeneratedDateIdea = {
 
 type SavedDateIdea = GeneratedDateIdea & {
   id: string;
-  userId: string;
-  isFavorite: boolean;
   isCompleted: boolean;
   completedAt: string;
   createdAt: string;
@@ -109,12 +107,6 @@ export default function DateGeneratorPage() {
       return;
     }
 
-    await loadSavedIdeas(userId);
-  };
-
-  const handleToggleFavorite = async (item: SavedDateIdea) => {
-    if (!userId) return;
-    await toggleDateFavorite(userId, item.id, !item.isFavorite);
     await loadSavedIdeas(userId);
   };
 
@@ -243,21 +235,13 @@ export default function DateGeneratorPage() {
                   <p className="text-xs text-purple-300/60">{item.category} • {item.budget} • {item.source}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {item.isFavorite ? <span className="text-xs text-amber-300">★ Favorite</span> : null}
                   {item.isCompleted ? <span className="text-xs text-emerald-300">✓ Completed</span> : null}
                 </div>
               </div>
 
               <p className="text-sm text-purple-100">{item.summary}</p>
 
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleToggleFavorite(item)}
-                  className="rounded-lg bg-[#0d0a14] px-2 py-2 text-xs text-purple-200 border border-purple-900/40"
-                >
-                  {item.isFavorite ? 'Unfavorite' : 'Favorite'}
-                </button>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleToggleCompleted(item)}

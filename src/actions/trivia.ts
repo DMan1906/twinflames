@@ -2,7 +2,6 @@
 
 import { ID, Query } from 'node-appwrite';
 import { createAdminClient } from '@/lib/appwrite';
-import { decryptData, encryptData } from '@/lib/crypto';
 import { generateText } from '@/actions/ai';
 
 type TriviaMode = 'general' | 'relationship';
@@ -13,13 +12,17 @@ type TriviaQuestion = {
   correctAnswer?: string;
 };
 
+type TriviaSessionState = {
+  readyUserIds: string[];
+  starterUserId: string;
+  currentIndex: number;
+  questions: TriviaQuestion[];
+  answers: Record<string, Record<string, string>>;
+};
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return 'Unexpected error';
-}
-
-function todayString() {
-  return new Date().toISOString().split('T')[0];
 }
 
 function parseJson<T>(value: string, fallback: T): T {
@@ -28,6 +31,21 @@ function parseJson<T>(value: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function parseState(value: string | undefined): TriviaSessionState {
+  if (!value) {
+    return { readyUserIds: [], starterUserId: '', currentIndex: 0, questions: [], answers: {} };
+  }
+
+  const parsed = parseJson<Partial<TriviaSessionState>>(value, {});
+  return {
+    readyUserIds: Array.isArray(parsed.readyUserIds) ? parsed.readyUserIds.map(String) : [],
+    starterUserId: String(parsed.starterUserId || ''),
+    currentIndex: Number(parsed.currentIndex || 0),
+    questions: Array.isArray(parsed.questions) ? parsed.questions : [],
+    answers: typeof parsed.answers === 'object' && parsed.answers ? parsed.answers as Record<string, Record<string, string>> : {},
+  };
 }
 
 async function getPairContext(userId: string) {
@@ -76,9 +94,7 @@ export async function getTriviaState(userId: string) {
     }
 
     const doc = result.documents[0];
-    const readyUserIds = parseJson<string[]>(String(doc.ready_user_ids || '[]'), []);
-    const questions = doc.questions_json ? parseJson<TriviaQuestion[]>(decryptData(String(doc.questions_json)), []) : [];
-    const answers = doc.answers_json ? parseJson<Record<string, Record<string, string>>>(decryptData(String(doc.answers_json)), {}) : {};
+    const state = parseState(String(doc.questions_json || ''));
 
     return {
       success: true,
@@ -86,12 +102,12 @@ export async function getTriviaState(userId: string) {
       state: {
         id: doc.$id,
         mode: String(doc.mode || 'general') as TriviaMode,
-        status: String(doc.status || 'waiting'),
-        readyUserIds,
-        starterUserId: String(doc.starter_user_id || ''),
-        currentIndex: Number(doc.current_index || 0),
-        questions,
-        answers,
+        status: String(doc.status || 'active'),
+        readyUserIds: state.readyUserIds,
+        starterUserId: state.starterUserId,
+        currentIndex: state.currentIndex,
+        questions: state.questions,
+        answers: state.answers,
       },
     };
   } catch (error: unknown) {
@@ -114,16 +130,21 @@ export async function setTriviaReady(userId: string, mode: TriviaMode) {
     ]);
 
     if (active.total === 0) {
+      const state: TriviaSessionState = {
+        readyUserIds: [userId],
+        starterUserId: '',
+        currentIndex: 0,
+        questions: [],
+        answers: {},
+      };
       const created = await databases.createDocument(DB_ID, SESSIONS_ID, ID.unique(), {
         chat_id: chatId,
-        mode,
-        status: 'waiting',
-        ready_user_ids: JSON.stringify([userId]),
-        starter_user_id: '',
-        questions_json: '',
-        answers_json: '',
-        current_index: 0,
-        created_at: todayString(),
+        user1_id: userId,
+        user2_id: partnerId,
+        user1_score: 0,
+        user2_score: 0,
+        questions_json: JSON.stringify(state),
+        status: 'active',
       });
 
       return { success: true, sessionId: created.$id };
@@ -131,29 +152,28 @@ export async function setTriviaReady(userId: string, mode: TriviaMode) {
 
     const session = active.documents[0];
 
-    const ready = new Set(parseJson<string[]>(String(session.ready_user_ids || '[]'), []));
+    const state = parseState(String(session.questions_json || ''));
+    const ready = new Set(state.readyUserIds);
     ready.add(userId);
 
     const readyList = Array.from(ready);
-    let payload: Record<string, unknown> = {
-      ready_user_ids: JSON.stringify(readyList),
-      mode,
-    };
+    state.readyUserIds = readyList;
+    state.questions = state.questions || [];
 
-    if (readyList.includes(partnerId) && readyList.includes(userId)) {
+    if (readyList.includes(partnerId) && readyList.includes(userId) && state.questions.length === 0) {
       const questions = await generateTriviaQuestions(mode);
       const starter = Math.random() > 0.5 ? userId : partnerId;
-      payload = {
-        ...payload,
-        status: 'active',
-        starter_user_id: starter,
-        current_index: 0,
-        questions_json: encryptData(JSON.stringify(questions)),
-        answers_json: encryptData(JSON.stringify({})),
-      };
+      state.starterUserId = starter;
+      state.currentIndex = 0;
+      state.questions = questions;
+      state.answers = {};
     }
 
-    await databases.updateDocument(DB_ID, SESSIONS_ID, session.$id, payload);
+    await databases.updateDocument(DB_ID, SESSIONS_ID, session.$id, {
+      mode,
+      questions_json: JSON.stringify(state),
+      status: String(session.status || 'active'),
+    });
     return { success: true, sessionId: session.$id };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
@@ -180,40 +200,55 @@ export async function submitTriviaAnswer(userId: string, sessionId: string, answ
       return { success: false, error: 'Trivia session is not active.' };
     }
 
-    const currentIndex = Number(session.current_index || 0);
-    const questions = session.questions_json ? parseJson<TriviaQuestion[]>(decryptData(String(session.questions_json)), []) : [];
-    const answers = session.answers_json ? parseJson<Record<string, Record<string, string>>>(decryptData(String(session.answers_json)), {}) : {};
+    const state = parseState(String(session.questions_json || ''));
+    const currentIndex = Number(state.currentIndex || 0);
 
-    if (currentIndex >= questions.length) {
+    if (currentIndex >= state.questions.length) {
       return { success: false, error: 'Trivia is already complete.' };
     }
 
-    const starterUserId = String(session.starter_user_id || userId);
+    const starterUserId = String(state.starterUserId || userId);
     const expectedFirst = currentIndex % 2 === 0 ? starterUserId : (starterUserId === userId ? partnerId : userId);
 
     const key = String(currentIndex);
-    const currentAnswers = answers[key] || {};
+    const currentAnswers = state.answers[key] || {};
 
     if (!currentAnswers[expectedFirst] && userId !== expectedFirst) {
       return { success: false, error: 'Wait for your partner to answer first this round.' };
     }
 
     currentAnswers[userId] = answer.trim();
-    answers[key] = currentAnswers;
+    state.answers[key] = currentAnswers;
 
     let nextIndex = currentIndex;
-    let status = String(session.status);
+    let status = String(session.status || 'active');
+    let user1Score = Number(session.user1_score || 0);
+    let user2Score = Number(session.user2_score || 0);
 
     if (currentAnswers[userId] && currentAnswers[partnerId]) {
+      const currentQuestion = state.questions[currentIndex];
+      if (currentQuestion?.correctAnswer) {
+        const correct = String(currentQuestion.correctAnswer).trim();
+        if (String(currentAnswers[String(session.user1_id)] || '').trim() === correct) {
+          user1Score += 1;
+        }
+        if (String(currentAnswers[String(session.user2_id)] || '').trim() === correct) {
+          user2Score += 1;
+        }
+      }
+
       nextIndex = currentIndex + 1;
-      if (nextIndex >= questions.length) {
+      if (nextIndex >= state.questions.length) {
         status = 'completed';
       }
     }
 
+    state.currentIndex = nextIndex;
+
     await databases.updateDocument(DB_ID, SESSIONS_ID, sessionId, {
-      answers_json: encryptData(JSON.stringify(answers)),
-      current_index: nextIndex,
+      questions_json: JSON.stringify(state),
+      user1_score: user1Score,
+      user2_score: user2Score,
       status,
     });
 

@@ -81,7 +81,7 @@ export default function TriviaPage() {
   }, [userId]);
 
   const currentQuestion = useMemo(() => {
-    if (!state || state.status !== 'active') return null;
+    if (!state || state.status !== 'active' || state.questions.length === 0) return null;
     return state.questions[state.currentIndex] || null;
   }, [state]);
 
@@ -148,7 +148,7 @@ export default function TriviaPage() {
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
-      {!state || state.status === 'waiting' ? (
+      {!state || (state.status !== 'completed' && state.questions.length === 0) ? (
         <section className="space-y-3 rounded-2xl border border-purple-800/40 bg-[#1a1525] p-4">
           <p className="text-sm text-purple-200">Waiting room</p>
           <p className="text-xs text-purple-300/60">
