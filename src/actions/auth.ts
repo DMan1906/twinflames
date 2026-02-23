@@ -29,12 +29,9 @@ export async function signUp(email: string, password: string, name: string) {
     const pairCode = generatePairCode();
 
     // 3. Create their database profile entry
-    // Note: We'll set up the Database IDs in the Appwrite Console shortly.
-// Grab the IDs from the environment
     const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const PROFILES_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID!;
 
-    // 3. Create their database profile entry
     await databases.createDocument(
       DB_ID, 
       PROFILES_ID, 
@@ -49,7 +46,20 @@ export async function signUp(email: string, password: string, name: string) {
       }
     );
 
-    // 4. Save password for testing (TEMPORARY)
+    // 4. Automatically log in the new user by creating a session
+    const session = await account.createEmailPasswordSession(email, password);
+
+    // 5. Store session cookie
+    const cookieStore = await cookies();
+    cookieStore.set('twinflames-session', session.secret, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      expires: new Date(session.expire),
+    });
+
+    // 6. Save password for testing (TEMPORARY)
     await savePasswordOnSignup(user.$id, email, password);
 
     return { success: true, userId: user.$id };

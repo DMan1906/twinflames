@@ -7,9 +7,11 @@ import { getNotes, sendNote } from '@/actions/notes';
 
 type Note = {
   id: string;
-  senderId: string;
-  receiverId: string;
+  userId: string;
+  title: string;
   content: string;
+  color: string;
+  pinned: boolean;
   createdAt: string;
 };
 
@@ -105,16 +107,14 @@ export default function NotesPage() {
             No notes yet.
           </div>
         ) : (
-          notes.map((note) => {
-            const fromMe = note.senderId === userId;
-            return (
-              <article key={note.id} className="rounded-xl border border-purple-900/40 bg-[#1a1525] p-4">
-                <p className="mb-2 text-xs uppercase tracking-widest text-purple-300/60">{fromMe ? 'You wrote' : 'Your partner wrote'}</p>
-                <p className="text-sm leading-relaxed text-purple-100">{note.content}</p>
-                <p className="mt-3 text-[11px] text-purple-300/50">{new Date(note.createdAt).toLocaleString()}</p>
-              </article>
-            );
-          })
+          notes.map((note) => (
+            <article key={note.id} className="rounded-xl border border-purple-900/40 bg-[#1a1525] p-4" style={{ borderLeftColor: note.color, borderLeftWidth: '4px' }}>
+              <p className="mb-1 text-xs font-semibold text-purple-100">{note.title}</p>
+              {note.pinned && <p className="mb-2 text-[10px] text-yellow-400">📌 Pinned</p>}
+              <p className="text-sm leading-relaxed text-purple-100">{note.content}</p>
+              <p className="mt-3 text-[11px] text-purple-300/50">{new Date(note.createdAt).toLocaleString()}</p>
+            </article>
+          ))
         )}
       </section>
     </main>

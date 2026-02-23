@@ -44,12 +44,10 @@ export async function createCoupon(userId: string, title: string, description = 
     await databases.createDocument(DB_ID, COUPONS_ID, ID.unique(), {
       chat_id: chatId,
       created_by: userId,
-      assigned_to: partnerId,
       title: encryptData(title.trim()),
       description: description.trim() ? encryptData(description.trim()) : '',
-      is_redeemed: false,
+      redeemed: false,
       redeemed_at: '',
-      created_at: todayString(),
     });
 
     return { success: true };
@@ -76,23 +74,24 @@ export async function getCoupons(userId: string) {
     const all = result.documents.map((doc) => ({
       id: doc.$id,
       createdBy: String(doc.created_by),
-      assignedTo: String(doc.assigned_to),
       title: decryptData(String(doc.title)),
       description: doc.description ? decryptData(String(doc.description)) : '',
-      isRedeemed: Boolean(doc.is_redeemed),
+      redeemed: Boolean(doc.redeemed),
       redeemedAt: String(doc.redeemed_at || ''),
       createdAt: String(doc.$createdAt),
     }));
 
+    // Coupons created by user are "given"
+    // All coupons in this chat are both given and received (can be redeemed by partner)
     const given = all.filter((coupon) => coupon.createdBy === userId);
-    const received = all.filter((coupon) => coupon.assignedTo === userId);
+    const received = all.filter((coupon) => coupon.createdBy !== userId);
 
     return {
       success: true,
       given,
       received: {
-        redeemed: received.filter((coupon) => coupon.isRedeemed),
-        unredeemed: received.filter((coupon) => !coupon.isRedeemed),
+        redeemed: received.filter((coupon) => coupon.redeemed),
+        unredeemed: received.filter((coupon) => !coupon.redeemed),
       },
     };
   } catch (error: unknown) {
@@ -118,16 +117,17 @@ export async function redeemCoupon(userId: string, couponId: string) {
       return { success: false, error: 'Coupon does not belong to this relationship.' };
     }
 
-    if (String(coupon.assigned_to) !== userId) {
+    // Only partner (who didn't create it) can redeem it
+    if (String(coupon.created_by) === userId) {
       return { success: false, error: 'Only the receiver can redeem this coupon.' };
     }
 
-    if (coupon.is_redeemed) {
+    if (coupon.redeemed) {
       return { success: true, alreadyRedeemed: true };
     }
 
     await databases.updateDocument(DB_ID, COUPONS_ID, couponId, {
-      is_redeemed: true,
+      redeemed: true,
       redeemed_at: todayString(),
     });
 
