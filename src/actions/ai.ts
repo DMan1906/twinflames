@@ -11,23 +11,28 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  */
 export async function generateText(prompt: string) {
   try {
-    // Try different model names in order of preference
-    let model;
-    // Updated model list - gemini-pro is deprecated
-    const modelOptions = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro-latest', 'gemini-1.5-pro'];
+    // Most reliable models as of 2026
+    const modelOptions = [
+      'gemini-2.0-flash',      // Latest and fastest
+      'gemini-1.5-flash',      // Reliable fallback
+      'gemini-1.0-pro',        // Stable older model
+    ];
     
+    let model;
     for (const modelName of modelOptions) {
       try {
+        console.log(`[AI] Trying model: ${modelName}`);
         model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
         const text = result.response.text().trim();
 
+        console.log(`[AI] ✓ Success with ${modelName}`);
         return { 
           success: true, 
           plaintext: text 
         };
       } catch (err: any) {
-        console.log(`Model ${modelName} failed, trying next...`, err.message);
+        console.log(`[AI] ✗ ${modelName} failed:`, err.message);
         // Continue to next model if this one fails
         if (modelName === modelOptions[modelOptions.length - 1]) {
           // Last model, rethrow error
@@ -38,8 +43,8 @@ export async function generateText(prompt: string) {
     
     return { success: false, error: 'AI is currently unavailable.' };
   } catch (error: any) {
-    console.error('AI Text Generation failed:', error);
-    return { success: false, error: `AI is currently unavailable: ${error.message || 'Unknown error'}` };
+    console.error('[AI] Text Generation failed:', error.message);
+    return { success: false, error: `AI unavailable: ${error.message?.slice(0, 100) || 'Unknown error'}` };
   }
 }
 
