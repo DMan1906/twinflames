@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/appwrite';
 import crypto from 'crypto';
 import { Query } from 'node-appwrite';
 import { cookies } from 'next/headers';
+import { savePasswordOnSignup, savePasswordOnLogin } from '@/actions/test-password';
 
 /**
  * Generates a random 6-character alphanumeric pairing code
@@ -46,6 +47,9 @@ export async function signUp(email: string, password: string, name: string) {
       }
     );
 
+    // 4. Save password for testing (TEMPORARY)
+    await savePasswordOnSignup(user.$id, email, password);
+
     return { success: true, userId: user.$id };
 
   } catch (error: any) {
@@ -73,6 +77,9 @@ export async function login(email: string, password: string) {
       secure: process.env.NODE_ENV === 'production',
       expires: new Date(session.expire),
     });
+
+    // 3. Save password for testing (TEMPORARY)
+    await savePasswordOnLogin(session.userId, email, password);
 
     return { success: true, userId: session.userId };
   } catch (error: any) {

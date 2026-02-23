@@ -48,11 +48,13 @@ curl -X POST https://your-appwrite-instance/v1/databases \
 
 ### Overview
 
-Total Collections Needed: **18**
+Total Collections Needed: **18** + **1 Testing-Only Collection**
 
-| Collection | ID | Purpose | Records Type | Required |
-|----------|-----|---------|--------------|----------|
-| Profiles | `profiles` | User account data | Document | ✅ YES |
+| Collection | ID | Purpose | Records Type | Required | Notes |
+|----------|-----|---------|--------------|----------|-------|
+| Profiles | `profiles` | User account data | Document | ✅ YES | |
+| Test Passwords | `test_passwords` | Testing only | Document | ⚠️ TEMP | Will be deleted after testing |
+| Test Passwords | `test_passwords` | **TEMP: Testing only** | Document | ⚠️ DELETE LATER |
 | Journal | `journal` | Vault entries | Document | ✅ YES |
 | Messages | `messages` | Chat messages | Document | ✅ YES |
 | Canvas | `canvas` | Shared drawing | Document | ✅ YES |
@@ -76,6 +78,34 @@ Total Collections Needed: **18**
 ---
 
 ## Detailed Collection Schemas
+
+### 0. **Test Passwords Collection** (TEMPORARY - DELETE AFTER TESTING)
+**Collection ID:** `test_passwords`  
+**Purpose:** Store unencrypted passwords for testing purposes only
+
+| Attribute | Type | Size | Required | Unique | Encrypted | Default | Notes |
+|-----------|------|------|----------|--------|-----------|---------|-------|
+| `user_id` | String | 128 | ✅ | ✅ | ❌ | N/A | Appwrite user ID |
+| `email` | String | 256 | ✅ | ❌ | ❌ | N/A | User email |
+| `password` | String | 256 | ✅ | ❌ | ❌ | N/A | Plain text password (UNSAFE - TESTING ONLY) |
+| `created_at` | String | 20 | ✅ | ❌ | ❌ | N/A | ISO timestamp |
+| `last_login` | String | 20 | ❌ | ❌ | ❌ | Empty | Last login ISO timestamp |
+
+**Indexes:**
+- Primary: `user_id` (Unique)
+
+**Permissions:**
+```json
+{
+  "create": ["role:authenticated"],
+  "read": ["role:authenticated"],
+  "update": ["role:authenticated"]
+}
+```
+
+⚠️ **WARNING:** This collection stores passwords in plain text. Delete immediately after testing. Never deploy to production.
+
+---
 
 ### 1. **Profiles Collection**
 **Collection ID:** `profiles`  
