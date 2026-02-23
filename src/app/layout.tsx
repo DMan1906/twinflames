@@ -42,6 +42,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Debug logging for deployment
+  if (typeof window !== 'undefined') {
+    console.log('🚀 TwinFlames App Loaded');
+    console.log('Environment:', process.env.NODE_ENV);
+  }
+
   return (
     <html lang="en">
       <head>
