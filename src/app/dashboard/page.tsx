@@ -6,19 +6,18 @@ import {
   Brain, 
   Heart, 
   Calendar, 
+  Camera, 
+  Sun, 
   MessageCircle, 
   Dices, 
   Palette, 
-  BookOpen,
-  Ticket,
-  ListChecks,
-  FlameKindling
+  BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import InstallHint from '@/components/InstallHint';
 
 export default async function DashboardPage() {
-  const { success, profile } = await getCurrentProfile();
+  const { success, profile, userId } = await getCurrentProfile();
 
   // Protect the route: if not logged in or not paired, kick them out
   if (!success || !profile) redirect('/');
@@ -59,10 +58,10 @@ export default async function DashboardPage() {
       <section className="bg-gradient-to-b from-[#251b3b] to-[#1a1525] border border-purple-700/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-2 mb-4">
           <MessageCircle size={18} className="text-purple-300" />
-          <h2 className="font-serif text-lg text-white">Today&apos;s Question</h2>
+          <h2 className="font-serif text-lg text-white">Today's Question</h2>
         </div>
         <p className="text-purple-200/80 text-sm mb-6 leading-relaxed italic">
-          &quot;What&apos;s something you&apos;ve never told me that you&apos;ve been wanting to share?&quot;
+          "What's something you've never told me that you've been wanting to share?"
         </p>
         <Link 
           href="/dashboard/today"
@@ -105,59 +104,10 @@ export default async function DashboardPage() {
             desc="Revisit your shared reflections" 
             color="text-amber-400" 
         />
-        <MenuCard
-          href="/dashboard/notes"
-          icon={<Heart />}
-          title="Love Notes"
-          desc="Leave messages for each other"
-          color="text-rose-400"
-        />
-        <MenuCard
-          href="/dashboard/coupons"
-          icon={<Ticket />}
-          title="Love Coupons"
-          desc="Create and redeem sweet coupons"
-          color="text-emerald-400"
-        />
-        <MenuCard
-          href="/dashboard/bucket-list"
-          icon={<ListChecks />}
-          title="Bucket List"
-          desc="Build your dreams together"
-          color="text-cyan-400"
-        />
-        <MenuCard
-          href="/dashboard/fantasy"
-          icon={<FlameKindling />}
-          title="Fantasy Matcher"
-          desc="Swipe and discover shared desires"
-          color="text-fuchsia-400"
-        />
-        <MenuCard
-          href="/dashboard/thumb-kiss"
-          icon={<Heart />}
-          title="Thumb Kiss"
-          desc="Sync finger touches in real-time"
-          color="text-pink-400"
-        />
-        <MenuCard
-          href="/dashboard/memories"
-          icon={<BookOpen />}
-          title="Memories"
-          desc="Save milestones with photos"
-          color="text-amber-400"
-        />
-        <MenuCard
-          href="/dashboard/social"
-          icon={<MessageCircle />}
-          title="Social Feed"
-          desc="Track accounts and post links together"
-          color="text-purple-400"
-        />
         
         {/* PLACEHOLDERS FOR FUTURE FEATURES */}
-        <MenuCard href="/dashboard/trivia" icon={<Brain />} title="Trivia Game" desc="Ready up and play in turns" color="text-fuchsia-400" />
-        <MenuCard href="/dashboard/dates" icon={<Calendar />} title="Date Ideas" desc="Generate and save date plans" color="text-amber-400" />
+        <MenuCard href="#" icon={<Brain />} title="Trivia Game" desc="Coming soon..." color="text-fuchsia-400 opacity-50" />
+        <MenuCard href="#" icon={<Calendar />} title="Date Ideas" desc="Coming soon..." color="text-amber-400 opacity-50" />
       </section>
     </main>
   );
