@@ -2,8 +2,8 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { appwriteClient, databases } from '@/lib/appwrite/client';
-import { ID, Query } from 'appwrite';
+import { appwriteClient } from '@/lib/appwrite/client';
+import { loadCanvasHistory, saveCanvasStroke } from '@/actions/canvas';
 import { Trash2, PenTool } from 'lucide-react';
 
 type Point = { x: number; y: number };
@@ -12,6 +12,7 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+  const [error, setError] = useState('');
   
   const chatId = [userId, partnerId].sort().join('_');
   const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
@@ -50,16 +51,15 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Load history
+    // Load history via server action (avoids CORS)
     const loadHistory = async () => {
       try {
-        const result = await databases.listDocuments(DB_ID, COL_ID, [
-          Query.equal('chat_id', chatId),
-          Query.limit(100)
-        ]);
-        result.documents.forEach(doc => {
-          drawLine(JSON.parse(doc.points), doc.color, doc.width, ctx);
-        });
+        const result = await loadCanvasHistory(userId);
+        if (result.success && result.strokes) {
+          result.strokes.forEach(stroke => {
+            drawLine(stroke.points, stroke.color, stroke.width, ctx);
+          });
+        }
       } catch (err) {
         console.error("Failed to load canvas history:", err);
       }
@@ -67,7 +67,7 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
 
     loadHistory();
 
-    // Subscribe to partner's strokes
+    // Subscribe to partner's strokes via Realtime
     const unsubscribe = appwriteClient.subscribe(
       `databases.${DB_ID}.collections.${COL_ID}.documents`,
       (response) => {
@@ -81,7 +81,7 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
     );
 
     return () => unsubscribe();
-  }, [chatId, userId, DB_ID, COL_ID]);
+  }, [userId, DB_ID, COL_ID, chatId]);
 
   // --- Event Handlers ---
   const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -117,17 +117,15 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
     }
     setIsDrawing(false);
 
-    // Save to Appwrite
+    // Save to Appwrite via server action (bypasses CORS)
     try {
-      await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
-        chat_id: chatId,
-        sender_id: userId,
-        points: JSON.stringify(currentPoints),
-        color: '#a855f7',
-        width: 5,
-      });
+      const result = await saveCanvasStroke(userId, currentPoints, '#a855f7', 5);
+      if (!result.success) {
+        setError(result.error || 'Failed to save stroke');
+      }
     } catch (err) {
       console.error("Failed to sync stroke:", err);
+      setError('Error saving stroke');
     }
     setCurrentPoints([]);
   };
@@ -149,6 +147,8 @@ export default function SharedCanvas({ userId, partnerId }: { userId: string, pa
           <Trash2 size={18} />
         </button>
       </div>
+
+      {error && <p className="text-sm text-red-400 px-2">{error}</p>}
 
       <div className="relative w-full aspect-square bg-white rounded-3xl shadow-2xl border-4 border-purple-900/20 overflow-hidden touch-none">
         <canvas

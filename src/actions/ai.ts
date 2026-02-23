@@ -13,7 +13,8 @@ export async function generateText(prompt: string) {
   try {
     // Try different model names in order of preference
     let model;
-    const modelOptions = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
+    // Updated model list - gemini-pro is deprecated
+    const modelOptions = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro-latest', 'gemini-1.5-pro'];
     
     for (const modelName of modelOptions) {
       try {
@@ -26,6 +27,7 @@ export async function generateText(prompt: string) {
           plaintext: text 
         };
       } catch (err: any) {
+        console.log(`Model ${modelName} failed, trying next...`, err.message);
         // Continue to next model if this one fails
         if (modelName === modelOptions[modelOptions.length - 1]) {
           // Last model, rethrow error
@@ -37,7 +39,7 @@ export async function generateText(prompt: string) {
     return { success: false, error: 'AI is currently unavailable.' };
   } catch (error: any) {
     console.error('AI Text Generation failed:', error);
-    return { success: false, error: 'AI is currently unavailable.' };
+    return { success: false, error: `AI is currently unavailable: ${error.message || 'Unknown error'}` };
   }
 }
 
