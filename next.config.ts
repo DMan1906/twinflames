@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
   
   // Keep this for Dokploy/Nixpacks deployment
   output: 'standalone',
+  
+  // Include public folder in standalone build
+  experimental: {
+    outputFileTracingIncludes: {
+      '/': ['./public/**/*'],
+    },
+  },
 
   // If TypeScript still complains about 'typescript', remove this block too.
   // Next.js 16 encourages running 'tsc' and 'eslint' as separate 
