@@ -19,7 +19,7 @@
     "appwrite": "^22.3.1",
     "framer-motion": "^12.34.2",
     "lucide-react": "^0.574.0",
-    "minio": "^8.0.6",
+    "minio": "^7.0.26",
     "next": "16.1.6",
     "node-appwrite": "^22.1.0",
     "react": "19.2.3",
@@ -33,8 +33,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint": "^10.0.1",
+    "eslint-config-next": "^0.2.4",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
