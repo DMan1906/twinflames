@@ -18,14 +18,16 @@ type Note = {
 export default function NotesPage() {
   const router = useRouter();
   const [userId, setUserId] = useState('');
+  const [partnerId, setPartnerId] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
 
-  const loadNotes = async (uid: string) => {
-    const result = await getNotes(uid);
+  const loadNotes = async (uid: string, pid: string) => {
+    const result = await getNotes(uid, pid);
     if (result.success) {
       setNotes(result.notes || []);
       setError('');
@@ -48,7 +50,8 @@ export default function NotesPage() {
       }
 
       setUserId(auth.userId);
-      await loadNotes(auth.userId);
+      setPartnerId(String(auth.profile.partner_id));
+      await loadNotes(auth.userId, String(auth.profile.partner_id));
       setLoading(false);
     }
 
@@ -57,7 +60,7 @@ export default function NotesPage() {
 
   const handleSend = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!message.trim() || !userId) return;
+    if (!message.trim() || !userId || !partnerId) return;
 
     setSending(true);
     const result = await sendNote(userId, message);
@@ -69,7 +72,7 @@ export default function NotesPage() {
     }
 
     setMessage('');
-    await loadNotes(userId);
+    await loadNotes(userId, partnerId);
   };
 
   if (loading) {
@@ -102,12 +105,31 @@ export default function NotesPage() {
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
       <section className="space-y-3">
-        {notes.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-full border border-purple-900/40 bg-[#14101d] p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('received')}
+            className={`flex-1 rounded-full px-3 py-2 font-semibold transition ${activeTab === 'received' ? 'bg-purple-600 text-white' : 'text-purple-200/70 hover:text-white'}`}
+          >
+            Received
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('sent')}
+            className={`flex-1 rounded-full px-3 py-2 font-semibold transition ${activeTab === 'sent' ? 'bg-purple-600 text-white' : 'text-purple-200/70 hover:text-white'}`}
+          >
+            Sent
+          </button>
+        </div>
+
+        {notes.filter((note) => (activeTab === 'sent' ? note.userId === userId : note.userId !== userId)).length === 0 ? (
           <div className="rounded-xl border border-purple-900/40 bg-[#1a1525] p-4 text-sm text-purple-300/70">
-            No notes yet.
+            {activeTab === 'sent' ? 'No sent notes yet.' : 'No received notes yet.'}
           </div>
         ) : (
-          notes.map((note) => (
+          notes
+            .filter((note) => (activeTab === 'sent' ? note.userId === userId : note.userId !== userId))
+            .map((note) => (
             <article key={note.id} className="rounded-xl border border-purple-900/40 bg-[#1a1525] p-4" style={{ borderLeftColor: note.color, borderLeftWidth: '4px' }}>
               <p className="mb-1 text-xs font-semibold text-purple-100">{note.title}</p>
               {note.pinned && <p className="mb-2 text-[10px] text-yellow-400">📌 Pinned</p>}

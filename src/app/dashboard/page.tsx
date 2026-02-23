@@ -1,6 +1,7 @@
 // src/app/dashboard/page.tsx
 import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/actions/auth';
+import { getProfileDashboard } from '@/actions/profile';
 import { 
   Flame, 
   Brain, 
@@ -24,6 +25,11 @@ export default async function DashboardPage() {
   if (!success || !profile) redirect('/');
   if (!profile.partner_id) redirect('/pair');
 
+  const dashboard = await getProfileDashboard(profile.user_id || profile.$id || '');
+  const hasDashboard = dashboard.success && dashboard.profile;
+  const streakCount = hasDashboard ? dashboard.profile.currentStreak : 0;
+  const bestStreak = hasDashboard ? dashboard.profile.bestStreak : streakCount;
+
   // Placeholders for names - eventually these can come from a 'Partners' collection fetch
   const userName = "Daniel"; 
   const partnerName = "Tania";
@@ -45,10 +51,10 @@ export default async function DashboardPage() {
         <div>
           <p className="text-xs text-purple-300/70 mb-1 uppercase tracking-wider">Current Streak</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-bold text-white">{profile.streak_count}</span>
+            <span className="text-5xl font-bold text-white">{streakCount}</span>
             <span className="text-purple-300/70">days</span>
           </div>
-          <p className="text-xs text-purple-300/50 mt-2">↗ Best: {profile.streak_count} days</p>
+          <p className="text-xs text-purple-300/50 mt-2">↗ Best: {bestStreak} days</p>
         </div>
         <div className="h-16 w-16 bg-purple-900/20 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(168,85,247,0.2)]">
           <Flame className="text-purple-400" size={32} />

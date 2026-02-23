@@ -28,8 +28,8 @@ async function getPairContext(userId: string) {
   return { databases, DB_ID, chatId };
 }
 
-export async function addBucketItem(userId: string, text: string) {
-  if (!text.trim()) {
+export async function addBucketItem(userId: string, title: string, description = '') {
+  if (!title.trim()) {
     return { success: false, error: 'Bucket list item text is required.' };
   }
 
@@ -44,12 +44,11 @@ export async function addBucketItem(userId: string, text: string) {
     await databases.createDocument(DB_ID, BUCKET_ID, ID.unique(), {
       chat_id: chatId,
       created_by: userId,
-      text: encryptData(text.trim()),
-      is_completed: false,
-      completed_by: '',
+      title: title.trim(),
+      description: description.trim() ? encryptData(description.trim()) : '',
+      completed: false,
       completed_at: '',
-      is_favorite: false,
-      created_at: todayString(),
+      priority: 'medium',
     });
 
     return { success: true };
@@ -76,11 +75,11 @@ export async function getBucketItems(userId: string) {
     const items = result.documents.map((doc) => ({
       id: doc.$id,
       createdBy: String(doc.created_by),
-      text: decryptData(String(doc.text)),
-      isCompleted: Boolean(doc.is_completed),
-      completedBy: String(doc.completed_by || ''),
+      title: String(doc.title),
+      description: doc.description ? decryptData(String(doc.description)) : '',
+      completed: Boolean(doc.completed),
       completedAt: String(doc.completed_at || ''),
-      isFavorite: Boolean(doc.is_favorite),
+      priority: String(doc.priority || 'medium'),
       createdAt: String(doc.$createdAt),
     }));
 
@@ -110,35 +109,8 @@ export async function setBucketItemCompleted(userId: string, itemId: string, com
     }
 
     await databases.updateDocument(DB_ID, BUCKET_ID, itemId, {
-      is_completed: completed,
-      completed_by: completed ? userId : '',
+      completed: completed,
       completed_at: completed ? todayString() : '',
-    });
-
-    return { success: true };
-  } catch (error: unknown) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
-export async function setBucketItemFavorite(userId: string, itemId: string, favorite: boolean) {
-  if (!itemId) return { success: false, error: 'Item id is required.' };
-
-  try {
-    const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_LIST_COLLECTION_ID!;
-    if (!BUCKET_ID) {
-      return { success: false, error: 'Bucket list collection is not configured.' };
-    }
-
-    const { databases, DB_ID, chatId } = await getPairContext(userId);
-    const item = await databases.getDocument(DB_ID, BUCKET_ID, itemId);
-
-    if (String(item.chat_id) !== chatId) {
-      return { success: false, error: 'Item does not belong to this relationship.' };
-    }
-
-    await databases.updateDocument(DB_ID, BUCKET_ID, itemId, {
-      is_favorite: favorite,
     });
 
     return { success: true };

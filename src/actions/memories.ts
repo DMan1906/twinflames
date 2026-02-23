@@ -85,12 +85,11 @@ export async function saveMemory(
 
     await databases.createDocument(DB_ID, MEMORIES_ID, ID.unique(), {
       chat_id: chatId,
-      user_id: userId,
-      title: encryptData(title.trim()),
+      created_by: userId,
+      title: title.trim(),
       description: encryptData(description.trim()),
-      date,
-      image_url: imageObjectKey || '',
-      created_at: todayString(),
+      photo_url: imageObjectKey || '',
+      memory_date: date,
     });
 
     return { success: true };
@@ -116,11 +115,11 @@ export async function getMemories(userId: string) {
 
     const memories = docs.documents.map((doc) => ({
       id: String(doc.$id),
-      userId: String(doc.user_id),
-      title: decryptData(String(doc.title)),
+      createdBy: String(doc.created_by),
+      title: String(doc.title),
       description: decryptData(String(doc.description)),
-      date: String(doc.date),
-      imageUrl: String(doc.image_url || ''),
+      date: String(doc.memory_date || ''),
+      imageUrl: String(doc.photo_url || ''),
       createdAt: String(doc.$createdAt),
     }));
 

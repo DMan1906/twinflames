@@ -26,6 +26,7 @@ export async function submitDailyAnswer(userId: string, question: string, answer
       prompt: question,
       content: encryptedAnswer,
       is_revealed: false,
+      partner_revealed: false,
     });
 
     if (partnerId) {

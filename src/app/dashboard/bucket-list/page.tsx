@@ -8,17 +8,16 @@ import {
   deleteBucketItem,
   getBucketItems,
   setBucketItemCompleted,
-  setBucketItemFavorite,
 } from '@/actions/bucket-list';
 
 type BucketItem = {
   id: string;
   createdBy: string;
-  text: string;
-  isCompleted: boolean;
-  completedBy: string;
+  title: string;
+  description: string;
+  completed: boolean;
   completedAt: string;
-  isFavorite: boolean;
+  priority: string;
   createdAt: string;
 };
 
@@ -82,19 +81,9 @@ export default function BucketListPage() {
 
   const toggleCompleted = async (item: BucketItem) => {
     if (!userId) return;
-    const result = await setBucketItemCompleted(userId, item.id, !item.isCompleted);
+    const result = await setBucketItemCompleted(userId, item.id, !item.completed);
     if (!result.success) {
       setError(result.error || 'Could not update item.');
-      return;
-    }
-    await loadItems(userId);
-  };
-
-  const toggleFavorite = async (item: BucketItem) => {
-    if (!userId) return;
-    const result = await setBucketItemFavorite(userId, item.id, !item.isFavorite);
-    if (!result.success) {
-      setError(result.error || 'Could not update favorite.');
       return;
     }
     await loadItems(userId);
@@ -148,14 +137,15 @@ export default function BucketListPage() {
           items.map((item) => (
             <article key={item.id} className="rounded-xl border border-purple-900/40 bg-[#1a1525] p-4">
               <div className="flex items-start justify-between gap-2">
-                <p className={`text-sm ${item.isCompleted ? 'text-purple-300/50 line-through' : 'text-purple-100'}`}>{item.text}</p>
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(item)}
-                  className={`rounded px-2 py-1 text-xs ${item.isFavorite ? 'bg-amber-500/20 text-amber-300' : 'bg-[#0d0a14] text-purple-300/70'}`}
-                >
-                  {item.isFavorite ? '★' : '☆'}
-                </button>
+                <div>
+                  <p className={`text-sm ${item.completed ? 'text-purple-300/50 line-through' : 'text-purple-100'}`}>{item.title}</p>
+                  {item.description ? (
+                    <p className="mt-1 text-xs text-purple-300/60">{item.description}</p>
+                  ) : null}
+                </div>
+                <span className="rounded bg-[#0d0a14] px-2 py-1 text-[10px] uppercase tracking-widest text-purple-300/60">
+                  {item.priority}
+                </span>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
@@ -164,7 +154,7 @@ export default function BucketListPage() {
                   onClick={() => toggleCompleted(item)}
                   className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
-                  {item.isCompleted ? 'Mark Pending' : 'Mark Complete'}
+                  {item.completed ? 'Mark Pending' : 'Mark Complete'}
                 </button>
                 <button
                   type="button"

@@ -43,7 +43,7 @@ export async function createNote(
   }
 }
 
-export async function getNotes(userId: string) {
+export async function getNotes(userId: string, partnerId: string) {
   try {
     const NOTES_ID = process.env.NEXT_PUBLIC_APPWRITE_NOTES_COLLECTION_ID!;
     if (!NOTES_ID) {
@@ -54,7 +54,7 @@ export async function getNotes(userId: string) {
     const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 
     const result = await databases.listDocuments(DB_ID, NOTES_ID, [
-      Query.equal('user_id', userId),
+      Query.equal('user_id', [userId, partnerId]),
       Query.orderDesc('$createdAt'),
       Query.limit(200),
     ]);
