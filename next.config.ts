@@ -4,15 +4,22 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   
-  // Use default production build for Docker/Dokploy
-  // (not standalone - that's for edge deployment)
-  // The default creates .next/ with all static assets included
+  // Optimize for container/Docker deployment
+  output: process.env.DOCKER_BUILD ? 'standalone' : undefined,
   
+  // Performance optimizations
+  productionBrowserSourceMaps: false,
+
   // If TypeScript still complains about 'typescript', remove this block too.
   // Next.js 16 encourages running 'tsc' and 'eslint' as separate 
   // CI steps rather than during 'next build'.
   typescript: {
     ignoreBuildErrors: true,
+  },
+
+  onDemandEntries: {
+    maxInactiveAge: 60 * 60 * 1000, // 1 hour
+    pagesBufferLength: 5,
   },
 };
 
